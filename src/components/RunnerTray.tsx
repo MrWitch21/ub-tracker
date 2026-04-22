@@ -1,5 +1,6 @@
-import type { Runner } from '../lib/types';
+﻿import type { Runner } from '../lib/types';
 import { runnerColor } from './RaceMap';
+import { resolveRunnerImageUrl } from '../lib/imageAssets';
 
 interface Props {
   runners: Runner[];
@@ -22,6 +23,7 @@ export default function RunnerTray({ runners, followRunnerId, onSelectFollow, si
         const color = runnerColor(idx);
         const isFollowed = r.id === followRunnerId;
         const progress = r.target_dist > 0 ? (r.logged_dist / r.target_dist) * 100 : 0;
+        const imgUrl = resolveRunnerImageUrl(r.img_url);
 
         return (
           <button
@@ -48,8 +50,8 @@ export default function RunnerTray({ runners, followRunnerId, onSelectFollow, si
               background: 'var(--bg)',
               ...(r.is_active ? { animation: 'glow 1.8s infinite' } : {}),
             }}>
-              {r.img_url ? (
-                <img src={r.img_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {imgUrl ? (
+                <img src={imgUrl} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <div style={{
                   width: '100%', height: '100%',

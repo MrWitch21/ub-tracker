@@ -1,5 +1,6 @@
-import type { Runner } from '../lib/types';
+﻿import type { Runner } from '../lib/types';
 import { useElapsed } from '../lib/hooks';
+import { resolveRunnerImageUrl } from '../lib/imageAssets';
 
 interface Props {
   runner: Runner | null;
@@ -8,6 +9,7 @@ interface Props {
 
 export default function ActiveRunnerCard({ runner, size = 'md' }: Props) {
   const elapsed = useElapsed(runner?.started_at ?? null, runner?.finished_at ?? null);
+  const imgUrl = resolveRunnerImageUrl(runner?.img_url);
 
   if (!runner) {
     return (
@@ -33,8 +35,8 @@ export default function ActiveRunnerCard({ runner, size = 'md' }: Props) {
         border: '4px solid var(--active)', boxShadow: '0 6px 20px rgba(231,76,60,0.25)',
         background: 'var(--bg)',
       }}>
-        {runner.img_url ? (
-          <img src={runner.img_url} alt={runner.name}
+        {imgUrl ? (
+          <img src={imgUrl} alt={runner.name}
                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{

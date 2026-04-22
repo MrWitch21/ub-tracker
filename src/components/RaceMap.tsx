@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+﻿import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, Pane } from 'react-leaflet';
 import L from 'leaflet';
 import type { Runner, PositionPoint } from '../lib/types';
 import { getRoute } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { resolveRunnerImageUrl } from '../lib/imageAssets';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -25,14 +26,16 @@ export function runnerColor(idx: number): string {
   return RUNNER_COLORS[idx % RUNNER_COLORS.length];
 }
 
-// Balaton overview — roughly covers the whole lake
+// Balaton overview - roughly covers the whole lake
 const BALATON_BOUNDS: L.LatLngBoundsLiteral = [
   [46.68, 17.22], // SW (near Keszthely)
   [47.05, 18.22], // NE (near Balatonkenese)
 ];
 
-function makeRunnerIcon(color: string, isActive: boolean, imgUrl: string | null): L.DivIcon {
-  const size = isActive ? 46 : 30;
+function makeRunnerIcon(color: string, isActive: boolean, imgUrl: string | null, markerScale: number): L.DivIcon {
+  const baseSize = isActive ? 46 : 30;
+  const size = Math.round(baseSize * markerScale);
+  const border = Math.max(2, Math.round((isActive ? 3 : 2) * Math.min(markerScale, 1.8)));
   const inner = imgUrl
     ? `<img src="${imgUrl}" alt="" style="width:100%;height:100%;object-fit:cover;" />`
     : `<div style="width:100%;height:100%;background:${color};"></div>`;
@@ -40,7 +43,7 @@ function makeRunnerIcon(color: string, isActive: boolean, imgUrl: string | null)
     className: '',
     html: `<div style="
       width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;
-      border:${isActive ? '3px' : '2px'} solid ${color};
+      border:${border}px solid ${color};
       box-shadow:0 4px 10px rgba(0,0,0,0.3);background:#fff;
       ${isActive ? 'animation: glow 1.8s infinite;' : ''}
     ">${inner}</div>`,
@@ -58,19 +61,25 @@ type CameraMode = 'follow' | 'overview';
 function CameraController({
   cameraMode,
   followPosition,
+  followZoom,
   overviewBounds,
+  overviewZoomOffset,
 }: {
   cameraMode: CameraMode;
   followPosition: [number, number] | null;
+  followZoom: number;
   overviewBounds: L.LatLngBoundsLiteral;
+  overviewZoomOffset: number;
 }) {
   const map = useMap();
   const userInteractingRef = useRef(false);
   const userInteractionTimeoutRef = useRef<number | null>(null);
+  const autoMoveUntilRef = useRef(0);
 
   // Track user interaction so auto-pan doesn't fight them
   useEffect(() => {
     const markInteracting = () => {
+      if (Date.now() < autoMoveUntilRef.current) return;
       userInteractingRef.current = true;
       if (userInteractionTimeoutRef.current !== null) {
         window.clearTimeout(userInteractionTimeoutRef.current);
@@ -96,11 +105,16 @@ function CameraController({
     if (userInteractingRef.current) return;
 
     if (cameraMode === 'follow' && followPosition) {
-      map.flyTo(followPosition, 16, { duration: 1.2, animate: true });
+      autoMoveUntilRef.current = Date.now() + 2_500;
+      map.flyTo(followPosition, followZoom, { duration: 1.2, animate: true });
     } else if (cameraMode === 'overview') {
-      map.flyToBounds(overviewBounds, { duration: 1.2, animate: true, padding: [40, 40] });
+      const bounds = L.latLngBounds(overviewBounds);
+      const baseZoom = map.getBoundsZoom(bounds, false, L.point(40, 40));
+      const targetZoom = Math.min(18, baseZoom + overviewZoomOffset);
+      autoMoveUntilRef.current = Date.now() + 2_500;
+      map.flyTo(bounds.getCenter(), targetZoom, { duration: 1.2, animate: true });
     }
-  }, [cameraMode, followPosition, map, overviewBounds]);
+  }, [cameraMode, followPosition, followZoom, map, overviewBounds, overviewZoomOffset]);
 
   return null;
 }
@@ -111,10 +125,16 @@ interface Props {
   defaultCenter?: [number, number];
   /** Pass a raceId to listen to reset broadcasts and purge the polyline cache. */
   raceId?: string;
-  /** If true, cycles camera: 40s follow active runner → 20s Balaton overview, repeat. */
+  /** If true, cycles camera: 40s follow active runner -> 20s Balaton overview, repeat. */
   autoPanCycle?: boolean;
   /** Overview bounds for the cycle. Defaults to Balaton. */
   overviewBounds?: L.LatLngBoundsLiteral;
+  /** Marker icon scale factor (1 = normal). */
+  markerScale?: number;
+  /** Zoom level used in active follow mode. */
+  followZoom?: number;
+  /** Additional zoom for overview mode (0.5 = half step in). */
+  overviewZoomOffset?: number;
 }
 
 export default function RaceMap({
@@ -124,11 +144,14 @@ export default function RaceMap({
   raceId,
   autoPanCycle = false,
   overviewBounds = BALATON_BOUNDS,
+  markerScale = 1,
+  followZoom = 17,
+  overviewZoomOffset = 0,
 }: Props) {
   const [routes, setRoutes] = useState<Map<string, PositionPoint[]>>(new Map());
   const [cameraMode, setCameraMode] = useState<CameraMode>('follow');
 
-  // Camera cycle timer: 40s follow → 20s overview → repeat
+  // Camera cycle timer: 40s follow -> 20s overview -> repeat
   useEffect(() => {
     if (!autoPanCycle) return;
     setCameraMode('follow');
@@ -166,7 +189,7 @@ export default function RaceMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runners.map((r) => r.id).join(',')]);
 
-  // Listen to race_reset broadcast — purge polyline cache
+  // Listen to race_reset broadcast - purge polyline cache
   useEffect(() => {
     if (!raceId) return;
     const channel = supabase
@@ -208,33 +231,65 @@ export default function RaceMap({
   }, [runners, defaultCenter]);
 
   return (
-    <MapContainer center={initialCenter} zoom={13} style={{ width: '100%', height: '100%' }}>
+    <MapContainer
+      center={initialCenter}
+      zoom={13}
+      zoomSnap={0.5}
+      zoomDelta={0.5}
+      style={{ width: '100%', height: '100%' }}
+    >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         maxZoom={19}
       />
+      <Pane name="labels" style={{ zIndex: 650, pointerEvents: 'none' }}>
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          pane="labels"
+          opacity={0.95}
+          maxZoom={20}
+        />
+      </Pane>
       {runners.map((runner, idx) => {
         const color = runnerColor(idx);
         const pts = routes.get(runner.id) ?? [];
         const positions: [number, number][] = pts.map((p) => [p.lat, p.lon]);
         const hasPos = runner.last_lat != null && runner.last_lon != null;
+        const runnerImgUrl = resolveRunnerImageUrl(runner.img_url);
+        const lineScale = Math.min(2.4, Math.max(1.1, markerScale));
+        const trackWeight = (runner.is_active ? 6 : 4) * lineScale;
         return (
           <React.Fragment key={runner.id}>
             {positions.length > 1 && (
-              <Polyline
-                positions={positions}
-                pathOptions={{
-                  color,
-                  weight: runner.is_active ? 5 : 3,
-                  opacity: runner.is_active ? 0.95 : 0.55,
-                }}
-              />
+              <>
+                <Polyline
+                  positions={positions}
+                  pathOptions={{
+                    color: '#0b1020',
+                    weight: trackWeight + 4,
+                    opacity: 0.42,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                  }}
+                />
+                <Polyline
+                  positions={positions}
+                  pathOptions={{
+                    color,
+                    weight: trackWeight,
+                    opacity: runner.is_active ? 0.98 : 0.8,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                  }}
+                />
+              </>
             )}
             {hasPos && (
               <Marker
                 position={[runner.last_lat!, runner.last_lon!]}
-                icon={makeRunnerIcon(color, runner.is_active, runner.img_url)}
+                icon={makeRunnerIcon(color, runner.is_active, runnerImgUrl, markerScale)}
               >
                 <Popup>
                   <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, minWidth: 140 }}>
@@ -257,7 +312,9 @@ export default function RaceMap({
         <CameraController
           cameraMode={cameraMode}
           followPosition={followPos}
+          followZoom={followZoom}
           overviewBounds={overviewBounds}
+          overviewZoomOffset={overviewZoomOffset}
         />
       ) : (
         <ManualFollower position={followPos} />

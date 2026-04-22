@@ -4,6 +4,7 @@ import { ArrowLeft, Play, Pause, MapPin, Battery, AlertCircle, Check } from 'luc
 import { useRace } from '../lib/hooks';
 import { useGeolocation } from '../lib/useGeolocation';
 import { recordGps } from '../lib/api';
+import { resolveRunnerImageUrl } from '../lib/imageAssets';
 import type { Runner } from '../lib/types';
 
 /**
@@ -54,7 +55,9 @@ export default function RunnerView() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {runners.map((r) => (
+              {runners.map((r) => {
+                const imgUrl = resolveRunnerImageUrl(r.img_url);
+                return (
                 <button
                   key={r.id}
                   onClick={() => setSelectedRunnerId(r.id)}
@@ -70,8 +73,8 @@ export default function RunnerView() {
                     background: 'var(--bg)', flexShrink: 0,
                     border: '2px solid var(--border)',
                   }}>
-                    {r.img_url ? (
-                      <img src={r.img_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {imgUrl ? (
+                      <img src={imgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: 'var(--muted)' }}>
                         {r.name.charAt(0).toUpperCase()}
@@ -87,7 +90,8 @@ export default function RunnerView() {
                   {r.is_active && <span style={{ color: 'var(--active)', fontSize: 12, fontWeight: 700 }}>● MOST FUT</span>}
                   {r.is_finished && <span style={{ color: 'var(--success)', fontSize: 12, fontWeight: 700 }}>✓ KÉSZ</span>}
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -111,6 +115,7 @@ export default function RunnerView() {
 
 function RunnerTracker({ runner, raceCode, onUnselect }: { runner: Runner; raceCode: string; onUnselect: () => void }) {
   const [stats, setStats] = useState({ sent: 0, lastDelta: 0, lastSentAt: null as number | null });
+  const runnerImgUrl = resolveRunnerImageUrl(runner.img_url);
 
   const { lat, lng, accuracy, timestamp, error, isTracking, start, stop } = useGeolocation({
     intervalMs: 15_000,
@@ -155,8 +160,8 @@ function RunnerTracker({ runner, raceCode, onUnselect }: { runner: Runner; raceC
             border: isTracking ? '2px solid #22c55e' : '2px solid rgba(255,255,255,0.2)',
             flexShrink: 0,
           }}>
-            {runner.img_url ? (
-              <img src={runner.img_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {runnerImgUrl ? (
+              <img src={runnerImgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800 }}>
                 {runner.name.charAt(0).toUpperCase()}

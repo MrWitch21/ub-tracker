@@ -5,6 +5,7 @@ import { useRace } from '../lib/hooks';
 import * as api from '../lib/api';
 import PinGate from '../components/PinGate';
 import GPSLoggerSetup from '../components/GPSLoggerSetup';
+import { foxconnLogoUrl, normalizeRunnerImageInput, resolveRunnerImageUrl } from '../lib/imageAssets';
 import type { Runner } from '../lib/types';
 
 export default function AdminView() {
@@ -50,7 +51,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       const nextSort = Math.max(0, ...runners.map((r) => r.sort_order)) + 1;
       await api.createRunner(race.id, {
         name: newRunner.name.trim(),
-        imgUrl: newRunner.imgUrl.trim() || null,
+        imgUrl: normalizeRunnerImageInput(newRunner.imgUrl),
         targetDist: Number(newRunner.targetDist) || 0,
         sortOrder: nextSort,
       });
@@ -67,7 +68,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       if (!editId) return;
       await api.updateRunner(editId, {
         name: editDraft.name,
-        img_url: editDraft.img_url ?? null,
+        img_url: normalizeRunnerImageInput(editDraft.img_url),
         target_dist: Number(editDraft.target_dist) || 0,
       });
       setEditId(null); setEditDraft({});
@@ -79,6 +80,11 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
         padding: '14px 20px', background: 'var(--brand)', color: '#fff',
         display: 'flex', alignItems: 'center', gap: 12, boxShadow: 'var(--shadow)',
       }}>
+        <img
+          src={foxconnLogoUrl}
+          alt="Foxconn"
+          style={{ height: 30, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+        />
         <Link to={`/race/${code}`} style={{ color: '#fff', display: 'flex', padding: 6 }}>
           <ArrowLeft size={20} />
         </Link>
@@ -183,6 +189,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {runners.map((runner) => {
               const isEditing = editId === runner.id;
+              const runnerImgUrl = resolveRunnerImageUrl(runner.img_url);
               return (
                 <div
                   key={runner.id}
@@ -196,8 +203,8 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                     background: 'var(--bg)', flexShrink: 0,
                     border: runner.is_active ? '2px solid var(--active)' : '2px solid var(--border)',
                   }}>
-                    {runner.img_url ? (
-                      <img src={runner.img_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {runnerImgUrl ? (
+                      <img src={runnerImgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontWeight: 800 }}>
                         {runner.name.charAt(0).toUpperCase()}
