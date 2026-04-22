@@ -1,27 +1,19 @@
 // =============================================================================
-// GPS ingest Edge Function
+// GPS ingest Edge Function (robust v2)
 // =============================================================================
 // Receives HTTP POST from GPSLogger (Android) and writes the point to Postgres.
 //
 // Deploy:  supabase functions deploy gps-ingest --no-verify-jwt
 //
-// URL shape that GPSLogger calls:
-//   POST https://<project>.supabase.co/functions/v1/gps-ingest?token=<gps_token>
-//   Body (JSON):  { "lat": 46.90, "lon": 17.89 }
-//
-// GPSLogger variables: %LAT %LON (and many more, see faq).
-// We do NOT require the Supabase anon key header — the gps_token in the query
-// string IS the auth. Deploy with --no-verify-jwt so GPSLogger (which can only
-// send one Authorization header) isn't required to include a JWT.
+// Accepts many body formats, logs what it receives for easy debugging.
 // =============================================================================
 
 // deno-lint-ignore-file
-// @ts-nocheck - Deno types are resolved at deploy time by Supabase
+// @ts-nocheck
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-// Service role key is injected automatically; it bypasses RLS (needed because we use the token as auth)
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -41,27 +33,78 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Safely parse a number from multiple possible formats
 function parseNum(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
-  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  const s = String(v).trim();
+  if (!s || s.startsWith('%')) return null;        // unresolved GPSLogger var like %LAT
+  const n = parseFloat(s.replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Try every reasonable body format: URL params, JSON, sloppy JSON (unquoted keys),
+ * form-urlencoded, and fallback regex.
+ */
+async function extractCoords(req: Request, url: URL): Promise<{ lat: number | null; lon: number | null; raw: string }> {
+  // 1. Try URL query params first (works even if body is empty)
+  let lat = parseNum(url.searchParams.get('lat') ?? url.searchParams.get('latitude'));
+  let lon = parseNum(url.searchParams.get('lon') ?? url.searchParams.get('lng') ?? url.searchParams.get('longitude'));
+
+  const rawText = await req.text().catch(() => '');
+
+  if (!rawText) return { lat, lon, raw: rawText };
+
+  // 2a. JSON body
+  if (lat === null || lon === null) {
+    try {
+      const body = JSON.parse(rawText);
+      lat = lat ?? parseNum(body.lat ?? body.latitude);
+      lon = lon ?? parseNum(body.lon ?? body.lng ?? body.longitude);
+    } catch { /* not JSON */ }
+  }
+
+  // 2b. Sloppy JSON like {lat:46.9,lon:17.8} — add missing quotes around keys
+  if (lat === null || lon === null) {
+    try {
+      const fixed = rawText.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+      const body = JSON.parse(fixed);
+      lat = lat ?? parseNum(body.lat ?? body.latitude);
+      lon = lon ?? parseNum(body.lon ?? body.lng ?? body.longitude);
+    } catch { /* still not JSON */ }
+  }
+
+  // 2c. Form-urlencoded: lat=46.9&lon=17.8
+  if (lat === null || lon === null) {
+    try {
+      const params = new URLSearchParams(rawText);
+      lat = lat ?? parseNum(params.get('lat') ?? params.get('latitude'));
+      lon = lon ?? parseNum(params.get('lon') ?? params.get('lng') ?? params.get('longitude'));
+    } catch { /* ignore */ }
+  }
+
+  // 2d. Regex fallback: anywhere in the raw text
+  if (lat === null || lon === null) {
+    const latMatch = rawText.match(/lat(?:itude)?\s*[=:]\s*"?(-?\d+\.?\d*)"?/i);
+    const lonMatch = rawText.match(/lo(?:n|ng)(?:itude)?\s*[=:]\s*"?(-?\d+\.?\d*)"?/i);
+    if (latMatch) lat = lat ?? parseNum(latMatch[1]);
+    if (lonMatch) lon = lon ?? parseNum(lonMatch[1]);
+  }
+
+  return { lat, lon, raw: rawText };
+}
+
 Deno.serve(async (req: Request) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
-  // Health check (GPSLogger's "Validate" button does a GET)
   if (req.method === 'GET') {
-    return json({ status: 'ok', service: 'ub-tracker gps-ingest' });
+    return json({ status: 'ok', service: 'ub-tracker gps-ingest', version: 2 });
   }
 
   if (req.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405);
   }
 
-  // ── Extract token ────────────────────────────────────────────────────────
+  // ── Token ────────────────────────────────────────────────────────────────
   const url = new URL(req.url);
   const token =
     url.searchParams.get('token') ??
@@ -72,39 +115,34 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'missing_token', hint: 'Add ?token=XXX to URL' }, 401);
   }
 
-  // ── Parse body (support JSON + url-encoded for flexibility) ─────────────
-  let lat: number | null = null;
-  let lon: number | null = null;
-  try {
-    const contentType = req.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      const body = await req.json();
-      lat = parseNum(body.lat ?? body.latitude);
-      lon = parseNum(body.lon ?? body.lng ?? body.longitude);
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      const text = await req.text();
-      const params = new URLSearchParams(text);
-      lat = parseNum(params.get('lat') ?? params.get('latitude'));
-      lon = parseNum(params.get('lon') ?? params.get('lng') ?? params.get('longitude'));
-    } else {
-      // Try query params as last resort (GET-style body-less)
-      lat = parseNum(url.searchParams.get('lat'));
-      lon = parseNum(url.searchParams.get('lon'));
-    }
-  } catch (err) {
-    return json({ error: 'bad_body', detail: String(err) }, 400);
-  }
+  // ── Coords ───────────────────────────────────────────────────────────────
+  const { lat, lon, raw } = await extractCoords(req, url);
 
   if (lat === null || lon === null) {
-    return json({ error: 'missing_coords', hint: 'Expected {"lat":..,"lon":..}' }, 400);
+    // Log EVERYTHING to help debugging — visible in Supabase Dashboard → Functions → Logs
+    console.error('BAD REQUEST: could not extract coords', {
+      token_prefix: token.substring(0, 4) + '…',
+      content_type: req.headers.get('content-type'),
+      user_agent: req.headers.get('user-agent'),
+      body_length: raw.length,
+      body_preview: raw.substring(0, 400),
+      query: url.search,
+    });
+    return json({
+      error: 'missing_coords',
+      hint: 'Body must contain lat and lon. Expected: {"lat":46.9,"lon":17.88}',
+      received: {
+        content_type: req.headers.get('content-type'),
+        body_preview: raw.substring(0, 200),
+      },
+    }, 400);
   }
 
-  // Basic sanity — reject obviously invalid coords
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-    return json({ error: 'invalid_coords' }, 400);
+    return json({ error: 'invalid_coords', lat, lon }, 400);
   }
 
-  // ── Write to DB via the token RPC ────────────────────────────────────────
+  // ── Write ────────────────────────────────────────────────────────────────
   const { data, error } = await supabase.rpc('record_gps_by_token', {
     p_token: token,
     p_lat: lat,
