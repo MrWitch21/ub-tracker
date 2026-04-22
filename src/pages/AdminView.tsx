@@ -5,14 +5,13 @@ import { useRace } from '../lib/hooks';
 import * as api from '../lib/api';
 import PinGate from '../components/PinGate';
 import GPSLoggerSetup from '../components/GPSLoggerSetup';
-import ImageUpload from '../components/ImageUpload';
 import type { Runner } from '../lib/types';
 
 export default function AdminView() {
   const { code } = useParams<{ code: string }>();
   const { race, runners, teamTotal, loading, error } = useRace(code);
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Betöltés…</div>;
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>BetĂ¶ltĂ©sâ€¦</div>;
   if (error || !race) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--danger)' }}>
@@ -31,14 +30,14 @@ export default function AdminView() {
 
 function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<ReturnType<typeof useRace>['race']>; runners: Runner[]; teamTotal: number; code: string }) {
   const [busy, setBusy] = useState(false);
-  const [newRunner, setNewRunner] = useState({ name: '', targetDist: '' });
+  const [newRunner, setNewRunner] = useState({ name: '', imgUrl: '', targetDist: '' });
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<Runner>>({});
   const [gpsSetupRunner, setGpsSetupRunner] = useState<Runner | null>(null);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
 
-  async function guarded(fn: () => Promise<any>, errMsg = 'Hiba történt.') {
+  async function guarded(fn: () => Promise<any>, errMsg = 'Hiba tĂ¶rtĂ©nt.') {
     setBusy(true);
     try { await fn(); }
     catch (err) { alert(`${errMsg}\n${(err as Error).message}`); }
@@ -51,11 +50,11 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       const nextSort = Math.max(0, ...runners.map((r) => r.sort_order)) + 1;
       await api.createRunner(race.id, {
         name: newRunner.name.trim(),
-        imgUrl: null,
+        imgUrl: newRunner.imgUrl.trim() || null,
         targetDist: Number(newRunner.targetDist) || 0,
         sortOrder: nextSort,
       });
-      setNewRunner({ name: '', targetDist: '' });
+      setNewRunner({ name: '', imgUrl: '', targetDist: '' });
     });
 
   const handleStartEdit = (r: Runner) => {
@@ -68,6 +67,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       if (!editId) return;
       await api.updateRunner(editId, {
         name: editDraft.name,
+        img_url: editDraft.img_url ?? null,
         target_dist: Number(editDraft.target_dist) || 0,
       });
       setEditId(null); setEditDraft({});
@@ -85,7 +85,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 17 }}>{race.name}</div>
           <div style={{ fontSize: 11, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>
-            Admin · {race.code}
+            Admin Â· {race.code}
           </div>
         </div>
       </header>
@@ -94,10 +94,10 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
         {/* Share with runners */}
         <section className="card" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-            Oszd meg a futókkal / Share with runners
+            Oszd meg a futĂłkkal / Share with runners
           </div>
           <div style={{ fontSize: 14, marginBottom: 10 }}>
-            A futók ezen a linken keresztül tudnak GPS-t küldeni:
+            A futĂłk ezen a linken keresztĂĽl tudnak GPS-t kĂĽldeni:
           </div>
           <div style={{
             padding: 12, background: '#fff', borderRadius: 8,
@@ -111,24 +111,24 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
             style={{ marginTop: 10 }}
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/race/${race.code}/run`);
-              alert('Link másolva! / Link copied!');
+              alert('Link mĂˇsolva! / Link copied!');
             }}
           >
-            Link másolása / Copy link
+            Link mĂˇsolĂˇsa / Copy link
           </button>
         </section>
 
         {/* Race control */}
         <section className="card">
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Verseny vezérlés / Race control
+            Verseny vezĂ©rlĂ©s / Race control
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 16 }}>
             <Stat label="Tervezett rajt / Planned"      value={fmtDateTime(race.planned_start_at)} />
-            <Stat label="Tényleges rajt / Actual start" value={fmtDateTime(race.actual_start_at)}
+            <Stat label="TĂ©nyleges rajt / Actual start" value={fmtDateTime(race.actual_start_at)}
                   accent={race.actual_start_at ? 'success' : undefined} />
-            <Stat label="Tényleges cél / Actual end"    value={fmtDateTime(race.actual_end_at)}
+            <Stat label="TĂ©nyleges cĂ©l / Actual end"    value={fmtDateTime(race.actual_end_at)}
                   accent={race.actual_end_at ? 'brand' : undefined} />
             <Stat label="Csapat / Team"                 value={`${teamTotal.toFixed(1)} / ${race.team_target.toFixed(0)} km`} />
           </div>
@@ -140,12 +140,12 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
             </button>
             <button className="btn btn-dark" disabled={busy}
                     onClick={() => guarded(() => api.raceEnd(race.id))}>
-              <Square size={14} /> CÉL / END
+              <Square size={14} /> CĂ‰L / END
             </button>
             <button
               className="btn btn-ghost" disabled={busy}
               onClick={() => {
-                if (confirm('Biztosan resetelni szeretnéd a teljes versenyt? Minden GPS adat törlődik!\n\nAre you sure?')) {
+                if (confirm('Biztosan resetelni szeretnĂ©d a teljes versenyt? Minden GPS adat tĂ¶rlĹ‘dik!\n\nAre you sure?')) {
                   guarded(() => api.raceReset(race.id));
                 }
               }}
@@ -171,12 +171,12 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
         {/* Runners */}
         <section className="card">
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Futók / Runners ({runners.length})
+            FutĂłk / Runners ({runners.length})
           </div>
 
           {runners.length === 0 && (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
-              Nincsenek futók. Add hozzá az elsőt lent.
+              Nincsenek futĂłk. Add hozzĂˇ az elsĹ‘t lent.
             </div>
           )}
 
@@ -191,19 +191,24 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                     border: `1px solid ${runner.is_active ? 'var(--active)' : runner.is_finished ? 'var(--finished)' : 'var(--border)'}`,
                   }}
                 >
-                  <ImageUpload
-                    value={runner.img_url}
-                    onFileSelected={async (file) => {
-                      const url = await api.uploadRunnerPhoto(runner.id, file);
-                      await api.updateRunner(runner.id, { img_url: url });
-                    }}
-                    onClear={() => guarded(() => api.updateRunner(runner.id, { img_url: null }))}
-                    size={50}
-                  />
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%', overflow: 'hidden',
+                    background: 'var(--bg)', flexShrink: 0,
+                    border: runner.is_active ? '2px solid var(--active)' : '2px solid var(--border)',
+                  }}>
+                    {runner.img_url ? (
+                      <img src={runner.img_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontWeight: 800 }}>
+                        {runner.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
 
                   {isEditing ? (
                     <div className="edit-runner-grid">
-                      <input value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} placeholder="Név" />
+                      <input value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} placeholder="NĂ©v" />
+                      <input value={editDraft.img_url ?? ''} onChange={(e) => setEditDraft({ ...editDraft, img_url: e.target.value })} placeholder="Image URL" />
                       <input type="number" step="0.1" value={editDraft.target_dist ?? ''} onChange={(e) => setEditDraft({ ...editDraft, target_dist: Number(e.target.value) })} placeholder="km" />
                     </div>
                   ) : (
@@ -211,8 +216,8 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{runner.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
                         {runner.logged_dist.toFixed(2)} / {runner.target_dist} km
-                        {runner.is_active && <span style={{ color: 'var(--active)', marginLeft: 10, fontWeight: 700 }}>● Most fut</span>}
-                        {runner.is_finished && <span style={{ color: 'var(--finished)', marginLeft: 10, fontWeight: 700 }}>✓ Kész</span>}
+                        {runner.is_active && <span style={{ color: 'var(--active)', marginLeft: 10, fontWeight: 700 }}>â—Ź Most fut</span>}
+                        {runner.is_finished && <span style={{ color: 'var(--finished)', marginLeft: 10, fontWeight: 700 }}>âś“ KĂ©sz</span>}
                       </div>
                     </div>
                   )}
@@ -243,13 +248,13 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                           onClick={() => guarded(() => api.finishRunner(runner.id, !runner.is_finished))}
                           disabled={busy}
                         >
-                          <Check size={13} /> {runner.is_finished ? 'KÉSZ' : 'Kész?'}
+                          <Check size={13} /> {runner.is_finished ? 'KĂ‰SZ' : 'KĂ©sz?'}
                         </button>
                         <button
                           className="btn btn-ghost"
                           style={{ color: 'var(--primary)' }}
                           onClick={() => setGpsSetupRunner(runner)}
-                          title="GPSLogger beállítás"
+                          title="GPSLogger beĂˇllĂ­tĂˇs"
                         >
                           <Smartphone size={13} />
                         </button>
@@ -260,7 +265,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                           className="btn btn-ghost"
                           style={{ color: 'var(--danger)' }}
                           onClick={() => {
-                            if (confirm(`Biztosan törlöd: ${runner.name}?`)) {
+                            if (confirm(`Biztosan tĂ¶rlĂ¶d: ${runner.name}?`)) {
                               guarded(() => api.deleteRunner(runner.id));
                             }
                           }}
@@ -281,17 +286,18 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
             borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)',
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              + Új futó / Add runner
+              + Ăšj futĂł / Add runner
             </div>
             <div className="new-runner-grid">
-              <input placeholder="Név / Name" value={newRunner.name} onChange={(e) => setNewRunner({ ...newRunner, name: e.target.value })} />
+              <input placeholder="NĂ©v / Name" value={newRunner.name} onChange={(e) => setNewRunner({ ...newRunner, name: e.target.value })} />
+              <input placeholder="Image URL (optional)" value={newRunner.imgUrl} onChange={(e) => setNewRunner({ ...newRunner, imgUrl: e.target.value })} />
               <input type="number" step="0.1" placeholder="km" value={newRunner.targetDist} onChange={(e) => setNewRunner({ ...newRunner, targetDist: e.target.value })} />
               <button className="btn btn-primary" onClick={handleCreate} disabled={busy || !newRunner.name.trim()}>
-                <Plus size={14} /> Hozzáad
+                <Plus size={14} /> HozzĂˇad
               </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-              💡 Létrehozás után kattints a futó profilképére a fényképed feltöltéséhez.
+              Optional: give an image URL now, or edit it later anytime.
             </div>
           </div>
         </section>
@@ -319,7 +325,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 function fmtDateTime(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return 'â€”';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString('hu-HU');
@@ -332,3 +338,4 @@ function toLocalInput(iso: string | null): string {
   const p = (n: number) => n.toString().padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+

@@ -93,6 +93,23 @@ async function extractCoords(req: Request, url: URL): Promise<{ lat: number | nu
   return { lat, lon, raw: rawText };
 }
 
+/**
+ * Detect the _type field in an OwnTracks payload.
+ * OwnTracks sends various payload types:
+ *   - "location"   (what we want)
+ *   - "status"     (periodic device info)
+ *   - "waypoint"   (region definition)
+ *   - "transition" (region enter/leave)
+ *   - "lwt"        (last will)
+ *   - "card"       (user info)
+ * Only "location" has lat/lon; others should be ignored with 200 OK.
+ */
+function detectOwnTracksType(raw: string): string | null {
+  if (!raw) return null;
+  const match = raw.match(/"_type"\s*:\s*"([a-z]+)"/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -118,7 +135,17 @@ Deno.serve(async (req: Request) => {
   // ── Coords ───────────────────────────────────────────────────────────────
   const { lat, lon, raw } = await extractCoords(req, url);
 
+  // OwnTracks sends non-location payloads too (status, waypoint, transition, lwt).
+  // These don't carry lat/lon and SHOULD succeed with 200 so the app doesn't
+  // think something's broken and stop publishing.
   if (lat === null || lon === null) {
+    // Try to detect OwnTracks _type
+    const ownTracksType = detectOwnTracksType(raw);
+    if (ownTracksType && ownTracksType !== 'location') {
+      console.log(`OwnTracks non-location payload ignored: _type=${ownTracksType}`);
+      return json({ ok: true, ignored: ownTracksType });
+    }
+
     // Log EVERYTHING to help debugging — visible in Supabase Dashboard → Functions → Logs
     console.error('BAD REQUEST: could not extract coords', {
       token_prefix: token.substring(0, 4) + '…',

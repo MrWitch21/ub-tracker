@@ -121,9 +121,9 @@ label {
   transition: width 0.6s ease;
 }
 
-/* ─── Responsive utilities ─────────────────────────────────────────── */
+/* â”€â”€â”€ Responsive utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* Admin runner row — wraps on mobile */
+/* Admin runner row â€” wraps on mobile */
 .runner-row {
   display: flex;
   align-items: center;
@@ -160,7 +160,7 @@ label {
 /* Admin new-runner form */
 .new-runner-grid {
   display: grid;
-  grid-template-columns: 2fr 100px auto;
+  grid-template-columns: 2fr 2fr 100px auto;
   gap: 8px;
 }
 @media (max-width: 520px) {
@@ -200,7 +200,7 @@ label {
 .edit-runner-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 2fr 1fr;
   gap: 6px;
   min-width: 0;
 }
@@ -210,7 +210,7 @@ label {
   }
 }
 
-/* Dashboard side-by-side layout → stacked on mobile */
+/* Dashboard side-by-side layout â†’ stacked on mobile */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -224,7 +224,7 @@ label {
   }
 }
 
-/* NewRace page — wider inputs on mobile */
+/* NewRace page â€” wider inputs on mobile */
 @media (max-width: 520px) {
   .card > form {
     gap: 12px;
@@ -261,3 +261,4 @@ label {
   word-break: break-all;
   max-width: 100%;
 }
+
