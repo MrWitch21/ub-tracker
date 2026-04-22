@@ -121,6 +121,116 @@ label {
   transition: width 0.6s ease;
 }
 
+/* ─── Responsive utilities ─────────────────────────────────────────── */
+
+/* Admin runner row — wraps on mobile */
+.runner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.runner-row .runner-info {
+  flex: 1;
+  min-width: 0;
+}
+.runner-row .runner-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .runner-row .runner-info {
+    flex: 1 1 calc(100% - 70px);
+  }
+  .runner-row .runner-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+}
+
+/* Admin new-runner form */
+.new-runner-grid {
+  display: grid;
+  grid-template-columns: 2fr 100px auto;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .new-runner-grid {
+    grid-template-columns: 1fr;
+  }
+  .new-runner-grid > button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Admin race-control button row */
+.race-control-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.race-control-row .race-control-spacer {
+  flex: 1;
+}
+.race-control-row input[type="datetime-local"] {
+  width: 200px;
+}
+@media (max-width: 640px) {
+  .race-control-row input[type="datetime-local"] {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .race-control-row .race-control-spacer {
+    display: none;
+  }
+}
+
+/* Admin edit-form inline grid */
+.edit-runner-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .edit-runner-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dashboard side-by-side layout → stacked on mobile */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  flex: 1;
+  overflow: hidden;
+}
+@media (max-width: 860px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(40vh, 1fr) auto;
+  }
+}
+
+/* NewRace page — wider inputs on mobile */
+@media (max-width: 520px) {
+  .card > form {
+    gap: 12px;
+  }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
@@ -139,7 +249,7 @@ label {
 /* "share code" styling */
 .share-code {
   font-family: var(--font-mono);
-  font-size: 32px;
+  font-size: clamp(22px, 6vw, 32px);
   font-weight: 800;
   letter-spacing: 0.15em;
   color: var(--primary);
@@ -148,4 +258,6 @@ label {
   border-radius: 10px;
   border: 2px dashed var(--primary);
   display: inline-block;
+  word-break: break-all;
+  max-width: 100%;
 }

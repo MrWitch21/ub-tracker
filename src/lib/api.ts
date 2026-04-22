@@ -89,6 +89,15 @@ export async function raceReset(raceId: string) {
     .from('races')
     .update({ actual_start_at: null, actual_end_at: null })
     .eq('id', raceId);
+
+  // Broadcast reset so map clients can purge their polyline caches
+  // (position_history is NOT in supabase_realtime publication so clients
+  // don't see the DELETEs — we need a manual signal)
+  await supabase.channel(`race-${raceId}`).send({
+    type: 'broadcast',
+    event: 'race_reset',
+    payload: { raceId, at: new Date().toISOString() },
+  });
 }
 
 // ── Runners ────────────────────────────────────────────────────────────────
@@ -129,6 +138,68 @@ export async function updateRunner(id: string, patch: Partial<Runner>) {
 export async function deleteRunner(id: string) {
   const { error } = await supabase.from('runners').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ── Photo upload ───────────────────────────────────────────────────────────
+
+/**
+ * Uploads a runner photo to Supabase Storage and returns a public URL.
+ * File is resized/compressed client-side before upload (keeps storage small).
+ */
+export async function uploadRunnerPhoto(runnerId: string, file: File): Promise<string> {
+  // Compress before upload: max 512 px, JPEG q=0.85
+  const compressed = await compressImage(file, 512, 0.85);
+
+  const ext = 'jpg';
+  const path = `${runnerId}-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('runner-photos')
+    .upload(path, compressed, {
+      contentType: 'image/jpeg',
+      upsert: true,
+      cacheControl: '31536000',
+    });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from('runner-photos').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/** Resize + compress an image client-side. Returns a Blob (JPEG). */
+async function compressImage(file: File, maxSize: number, quality: number): Promise<Blob> {
+  const img = await loadImage(file);
+
+  let { width, height } = img;
+  const scale = Math.min(1, maxSize / Math.max(width, height));
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context not available');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+      'image/jpeg',
+      quality,
+    );
+  });
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
 }
 
 /** Set a runner active — deactivates all others in the same race. */

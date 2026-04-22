@@ -60,6 +60,18 @@ export function useRace(code: string | undefined) {
               });
             }
           )
+          // Broadcast channel for admin-triggered events that can't come from postgres_changes
+          .on('broadcast', { event: 'race_reset' }, async () => {
+            // Re-fetch everything to ensure UI is in sync
+            try {
+              const fresh = await api.findRaceByCode(code);
+              if (!cancelled && fresh) {
+                setRace(fresh);
+                const runnerList = await api.listRunners(fresh.id);
+                if (!cancelled) setRunners(runnerList);
+              }
+            } catch { /* ignore */ }
+          })
           .subscribe();
       } catch (err) {
         if (!cancelled) setError((err as Error).message);

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { Runner, PositionPoint } from '../lib/types';
 import { getRoute } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -24,6 +25,12 @@ export function runnerColor(idx: number): string {
   return RUNNER_COLORS[idx % RUNNER_COLORS.length];
 }
 
+// Balaton overview — roughly covers the whole lake
+const BALATON_BOUNDS: L.LatLngBoundsLiteral = [
+  [46.68, 17.22], // SW (near Keszthely)
+  [47.05, 18.22], // NE (near Balatonkenese)
+];
+
 function makeRunnerIcon(color: string, isActive: boolean, imgUrl: string | null): L.DivIcon {
   const size = isActive ? 46 : 30;
   const inner = imgUrl
@@ -42,11 +49,59 @@ function makeRunnerIcon(color: string, isActive: boolean, imgUrl: string | null)
   });
 }
 
-function MapFollower({ position }: { position: [number, number] | null }) {
+type CameraMode = 'follow' | 'overview';
+
+/**
+ * Camera controller: cycles between following the active runner and showing Balaton overview.
+ * Pauses automatic panning when user manually drags the map, resumes after 15s of no interaction.
+ */
+function CameraController({
+  cameraMode,
+  followPosition,
+  overviewBounds,
+}: {
+  cameraMode: CameraMode;
+  followPosition: [number, number] | null;
+  overviewBounds: L.LatLngBoundsLiteral;
+}) {
   const map = useMap();
+  const userInteractingRef = useRef(false);
+  const userInteractionTimeoutRef = useRef<number | null>(null);
+
+  // Track user interaction so auto-pan doesn't fight them
   useEffect(() => {
-    if (position) map.panTo(position, { animate: true, duration: 0.8 });
-  }, [position, map]);
+    const markInteracting = () => {
+      userInteractingRef.current = true;
+      if (userInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(userInteractionTimeoutRef.current);
+      }
+      userInteractionTimeoutRef.current = window.setTimeout(() => {
+        userInteractingRef.current = false;
+      }, 15_000); // resume auto-cam after 15s idle
+    };
+
+    map.on('dragstart', markInteracting);
+    map.on('zoomstart', markInteracting);
+    return () => {
+      map.off('dragstart', markInteracting);
+      map.off('zoomstart', markInteracting);
+      if (userInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(userInteractionTimeoutRef.current);
+      }
+    };
+  }, [map]);
+
+  // Apply the camera mode
+  useEffect(() => {
+    if (userInteractingRef.current) return;
+
+    if (cameraMode === 'follow' && followPosition) {
+      map.flyTo(followPosition, 16, { duration: 1.2, animate: true });
+    } else if (cameraMode === 'overview') {
+      map.flyToBounds(overviewBounds, { duration: 1.2, animate: true, padding: [40, 40] });
+    }
+  }, [cameraMode, followPosition, map, overviewBounds]);
+
   return null;
 }
 
@@ -54,12 +109,45 @@ interface Props {
   runners: Runner[];
   followRunnerId: string | null;
   defaultCenter?: [number, number];
+  /** Pass a raceId to listen to reset broadcasts and purge the polyline cache. */
+  raceId?: string;
+  /** If true, cycles camera: 40s follow active runner → 20s Balaton overview, repeat. */
+  autoPanCycle?: boolean;
+  /** Overview bounds for the cycle. Defaults to Balaton. */
+  overviewBounds?: L.LatLngBoundsLiteral;
 }
 
-export default function RaceMap({ runners, followRunnerId, defaultCenter }: Props) {
+export default function RaceMap({
+  runners,
+  followRunnerId,
+  defaultCenter,
+  raceId,
+  autoPanCycle = false,
+  overviewBounds = BALATON_BOUNDS,
+}: Props) {
   const [routes, setRoutes] = useState<Map<string, PositionPoint[]>>(new Map());
+  const [cameraMode, setCameraMode] = useState<CameraMode>('follow');
 
-  // Fetch each runner's historical route once
+  // Camera cycle timer: 40s follow → 20s overview → repeat
+  useEffect(() => {
+    if (!autoPanCycle) return;
+    setCameraMode('follow');
+    let active = true;
+
+    const cycle = async () => {
+      while (active) {
+        setCameraMode('follow');
+        await wait(40_000);
+        if (!active) return;
+        setCameraMode('overview');
+        await wait(20_000);
+      }
+    };
+    cycle();
+    return () => { active = false; };
+  }, [autoPanCycle]);
+
+  // Load each runner's historical route once
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -78,7 +166,19 @@ export default function RaceMap({ runners, followRunnerId, defaultCenter }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runners.map((r) => r.id).join(',')]);
 
-  // Append live points from runner.last_lat/lon changes (no need for separate subscription)
+  // Listen to race_reset broadcast — purge polyline cache
+  useEffect(() => {
+    if (!raceId) return;
+    const channel = supabase
+      .channel(`race-${raceId}-map`)
+      .on('broadcast', { event: 'race_reset' }, () => {
+        setRoutes(new Map());
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [raceId]);
+
+  // Append live points from runner.last_lat/lon changes
   useEffect(() => {
     setRoutes((prev) => {
       const next = new Map(prev);
@@ -101,14 +201,14 @@ export default function RaceMap({ runners, followRunnerId, defaultCenter }: Prop
     return [r.last_lat, r.last_lon];
   }, [runners, followRunnerId]);
 
-  const center = useMemo((): [number, number] => {
+  const initialCenter = useMemo((): [number, number] => {
     const withPos = runners.find((r) => r.last_lat && r.last_lon);
     if (withPos) return [withPos.last_lat!, withPos.last_lon!];
-    return defaultCenter ?? [46.8495, 17.7285]; // Balaton
+    return defaultCenter ?? [46.8495, 17.7285];
   }, [runners, defaultCenter]);
 
   return (
-    <MapContainer center={center} zoom={13} style={{ width: '100%', height: '100%' }}>
+    <MapContainer center={initialCenter} zoom={13} style={{ width: '100%', height: '100%' }}>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -152,7 +252,28 @@ export default function RaceMap({ runners, followRunnerId, defaultCenter }: Prop
           </React.Fragment>
         );
       })}
-      <MapFollower position={followPos} />
+
+      {autoPanCycle ? (
+        <CameraController
+          cameraMode={cameraMode}
+          followPosition={followPos}
+          overviewBounds={overviewBounds}
+        />
+      ) : (
+        <ManualFollower position={followPos} />
+      )}
     </MapContainer>
   );
+}
+
+function ManualFollower({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.panTo(position, { animate: true, duration: 0.8 });
+  }, [position, map]);
+  return null;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -5,6 +5,7 @@ import { useRace } from '../lib/hooks';
 import * as api from '../lib/api';
 import PinGate from '../components/PinGate';
 import GPSLoggerSetup from '../components/GPSLoggerSetup';
+import ImageUpload from '../components/ImageUpload';
 import type { Runner } from '../lib/types';
 
 export default function AdminView() {
@@ -30,7 +31,7 @@ export default function AdminView() {
 
 function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<ReturnType<typeof useRace>['race']>; runners: Runner[]; teamTotal: number; code: string }) {
   const [busy, setBusy] = useState(false);
-  const [newRunner, setNewRunner] = useState({ name: '', imgUrl: '', targetDist: '' });
+  const [newRunner, setNewRunner] = useState({ name: '', targetDist: '' });
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<Runner>>({});
   const [gpsSetupRunner, setGpsSetupRunner] = useState<Runner | null>(null);
@@ -50,11 +51,11 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       const nextSort = Math.max(0, ...runners.map((r) => r.sort_order)) + 1;
       await api.createRunner(race.id, {
         name: newRunner.name.trim(),
-        imgUrl: newRunner.imgUrl.trim() || null,
+        imgUrl: null,
         targetDist: Number(newRunner.targetDist) || 0,
         sortOrder: nextSort,
       });
-      setNewRunner({ name: '', imgUrl: '', targetDist: '' });
+      setNewRunner({ name: '', targetDist: '' });
     });
 
   const handleStartEdit = (r: Runner) => {
@@ -67,7 +68,6 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
       if (!editId) return;
       await api.updateRunner(editId, {
         name: editDraft.name,
-        img_url: editDraft.img_url ?? null,
         target_dist: Number(editDraft.target_dist) || 0,
       });
       setEditId(null); setEditDraft({});
@@ -133,7 +133,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
             <Stat label="Csapat / Team"                 value={`${teamTotal.toFixed(1)} / ${race.team_target.toFixed(0)} km`} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="race-control-row">
             <button className="btn btn-success" disabled={busy}
                     onClick={() => guarded(() => api.raceStart(race.id))}>
               <Play size={14} /> RAJT / START
@@ -153,7 +153,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
               <RefreshCcw size={14} /> Reset
             </button>
 
-            <div style={{ flex: 1 }} />
+            <div className="race-control-spacer" />
 
             <input
               type="datetime-local"
@@ -164,7 +164,6 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                   await api.updateRace(race.id, { planned_start_at: v });
                 })
               }
-              style={{ width: 200 }}
             />
           </div>
         </section>
@@ -187,34 +186,28 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
               return (
                 <div
                   key={runner.id}
+                  className="runner-row"
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: 12,
-                    background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)',
                     border: `1px solid ${runner.is_active ? 'var(--active)' : runner.is_finished ? 'var(--finished)' : 'var(--border)'}`,
                   }}
                 >
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%', overflow: 'hidden',
-                    background: 'var(--bg)', flexShrink: 0,
-                    border: runner.is_active ? '2px solid var(--active)' : '2px solid var(--border)',
-                  }}>
-                    {runner.img_url ? (
-                      <img src={runner.img_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontWeight: 800 }}>
-                        {runner.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
+                  <ImageUpload
+                    value={runner.img_url}
+                    onFileSelected={async (file) => {
+                      const url = await api.uploadRunnerPhoto(runner.id, file);
+                      await api.updateRunner(runner.id, { img_url: url });
+                    }}
+                    onClear={() => guarded(() => api.updateRunner(runner.id, { img_url: null }))}
+                    size={50}
+                  />
 
                   {isEditing ? (
-                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '2fr 2fr 1fr', gap: 6 }}>
+                    <div className="edit-runner-grid">
                       <input value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} placeholder="Név" />
-                      <input value={editDraft.img_url ?? ''} onChange={(e) => setEditDraft({ ...editDraft, img_url: e.target.value })} placeholder="Kép URL" />
                       <input type="number" step="0.1" value={editDraft.target_dist ?? ''} onChange={(e) => setEditDraft({ ...editDraft, target_dist: Number(e.target.value) })} placeholder="km" />
                     </div>
                   ) : (
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="runner-info">
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{runner.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
                         {runner.logged_dist.toFixed(2)} / {runner.target_dist} km
@@ -224,7 +217,7 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <div className="runner-actions">
                     {isEditing ? (
                       <>
                         <button className="btn btn-success" onClick={handleSaveEdit} disabled={busy}>
@@ -290,13 +283,15 @@ function AdminContent({ race, runners, teamTotal, code }: { race: NonNullable<Re
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               + Új futó / Add runner
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 100px auto', gap: 8 }}>
+            <div className="new-runner-grid">
               <input placeholder="Név / Name" value={newRunner.name} onChange={(e) => setNewRunner({ ...newRunner, name: e.target.value })} />
-              <input placeholder="Kép URL (opc.) / Image URL" value={newRunner.imgUrl} onChange={(e) => setNewRunner({ ...newRunner, imgUrl: e.target.value })} />
               <input type="number" step="0.1" placeholder="km" value={newRunner.targetDist} onChange={(e) => setNewRunner({ ...newRunner, targetDist: e.target.value })} />
               <button className="btn btn-primary" onClick={handleCreate} disabled={busy || !newRunner.name.trim()}>
                 <Plus size={14} /> Hozzáad
               </button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+              💡 Létrehozás után kattints a futó profilképére a fényképed feltöltéséhez.
             </div>
           </div>
         </section>

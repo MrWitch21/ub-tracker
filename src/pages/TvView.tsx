@@ -4,6 +4,11 @@ import { useRace, useEventTimer, useElapsed } from '../lib/hooks';
 import RaceMap, { runnerColor } from '../components/RaceMap';
 import type { Runner } from '../lib/types';
 
+/**
+ * TV kiosk view — designed to look great from 1080p up to 4K.
+ * Layout: 1/3 sidebar (active runner + team) | 2/3 map | compact bottom runner strip.
+ * All font sizes use clamp() so they scale with viewport width.
+ */
 export default function TvView() {
   const { code } = useParams<{ code: string }>();
   const { race, runners, activeRunner, teamTotal, raceStartAt, loading, error } = useRace(code);
@@ -15,7 +20,7 @@ export default function TvView() {
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', background: '#0a0f1a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+      <div style={{ height: '100vh', background: '#0a0f1a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(24px, 2.5vw, 48px)' }}>
         Betöltés… / Loading…
       </div>
     );
@@ -23,7 +28,7 @@ export default function TvView() {
   if (error || !race) {
     return (
       <div style={{ height: '100vh', background: '#0a0f1a', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <div style={{ fontSize: 24 }}>{error ?? 'Race not found'}</div>
+        <div style={{ fontSize: 'clamp(20px, 2vw, 36px)' }}>{error ?? 'Race not found'}</div>
         <Link to="/" style={{ color: '#60a5fa', fontSize: 16 }}>← Vissza</Link>
       </div>
     );
@@ -34,55 +39,76 @@ export default function TvView() {
       height: '100vh', width: '100vw', overflow: 'hidden',
       background: '#0a0f1a', color: '#fff',
       display: 'grid',
-      gridTemplateColumns: '520px 1fr',
-      gridTemplateRows: '120px 1fr 220px',
+      // 1/3 sidebar | 2/3 map, compact header & footer
+      gridTemplateColumns: '1fr 2fr',
+      gridTemplateRows: 'clamp(72px, 7vh, 120px) 1fr clamp(120px, 14vh, 200px)',
     }}>
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
       <header style={{
         gridColumn: '1 / -1',
         background: '#111827',
-        display: 'flex', alignItems: 'center', gap: 30,
-        padding: '0 40px',
+        display: 'flex', alignItems: 'center',
+        gap: 'clamp(20px, 2vw, 40px)',
+        padding: '0 clamp(20px, 2vw, 48px)',
         borderBottom: '2px solid #1f2937',
       }}>
-        <div style={{ fontSize: 56 }}>🏃</div>
-        <div>
-          <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
+        <div style={{ fontSize: 'clamp(36px, 3.5vw, 72px)' }}>🏃</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 'clamp(22px, 2.2vw, 48px)', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {race.name}
           </div>
-          <div style={{ fontSize: 16, color: '#9ca3af', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: 'clamp(11px, 0.85vw, 18px)', color: '#9ca3af', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
             {race.code} · Élő követés
           </div>
         </div>
 
-        <div style={{ flex: 1 }} />
-
         <TvEventTimer raceStartAt={raceStartAt} raceEndAt={race.actual_end_at} />
       </header>
 
+      {/* ── LEFT SIDEBAR (1/3) ─────────────────────────────────────────── */}
       <aside style={{
         gridRow: '2 / 3',
         background: '#0f172a',
-        padding: 30,
+        padding: 'clamp(16px, 1.5vw, 36px)',
         borderRight: '2px solid #1f2937',
         overflowY: 'auto',
+        display: 'flex', flexDirection: 'column',
+        gap: 'clamp(14px, 1.2vw, 28px)',
       }}>
         <TvActiveRunner runner={activeRunner} />
 
         <div style={{
-          marginTop: 24, padding: 24,
+          padding: 'clamp(16px, 1.3vw, 28px)',
           background: '#111827', borderRadius: 14,
           border: '1px solid #1f2937',
+          flexShrink: 0,
         }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+          <div style={{
+            fontSize: 'clamp(11px, 0.8vw, 18px)',
+            fontWeight: 700, color: '#9ca3af',
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+            marginBottom: 'clamp(8px, 0.7vw, 14px)',
+          }}>
             Csapat · Team
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 64, fontWeight: 900, color: '#60a5fa', letterSpacing: '-0.03em', lineHeight: 1 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'clamp(40px, 4vw, 84px)',
+              fontWeight: 900, color: '#60a5fa',
+              letterSpacing: '-0.03em', lineHeight: 1,
+            }}>
               {teamTotal.toFixed(1)}
             </span>
-            <span style={{ fontSize: 24, color: '#6b7280' }}>/ {race.team_target.toFixed(0)} km</span>
+            <span style={{ fontSize: 'clamp(16px, 1.3vw, 32px)', color: '#6b7280' }}>
+              / {race.team_target.toFixed(0)} km
+            </span>
           </div>
-          <div style={{ marginTop: 14, height: 14, background: '#1f2937', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{
+            marginTop: 'clamp(10px, 0.8vw, 18px)',
+            height: 'clamp(10px, 0.9vw, 18px)',
+            background: '#1f2937', borderRadius: 999, overflow: 'hidden',
+          }}>
             <div style={{
               height: '100%',
               width: `${race.team_target > 0 ? Math.min(100, (teamTotal / race.team_target) * 100) : 0}%`,
@@ -93,17 +119,25 @@ export default function TvView() {
         </div>
       </aside>
 
+      {/* ── MAP (2/3) ──────────────────────────────────────────────────── */}
       <div style={{ gridRow: '2 / 3', position: 'relative' }}>
-        <RaceMap runners={runners} followRunnerId={activeRunner?.id ?? null} />
+        <RaceMap
+          runners={runners}
+          followRunnerId={activeRunner?.id ?? null}
+          raceId={race.id}
+          autoPanCycle
+        />
       </div>
 
+      {/* ── FOOTER: runner strip (compact) ────────────────────────────── */}
       <footer style={{
         gridColumn: '1 / -1',
         background: '#111827',
         borderTop: '2px solid #1f2937',
-        padding: '16px 24px',
-        display: 'flex', gap: 16,
-        overflowX: 'auto',
+        padding: 'clamp(10px, 0.9vw, 20px) clamp(14px, 1.1vw, 24px)',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${Math.max(1, runners.length)}, minmax(0, 1fr))`,
+        gap: 'clamp(8px, 0.7vw, 16px)',
       }}>
         {runners.map((r, idx) => (
           <TvRunnerTile key={r.id} runner={r} color={runnerColor(idx)} />
@@ -121,17 +155,28 @@ export default function TvView() {
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────
+
 function TvEventTimer({ raceStartAt, raceEndAt }: { raceStartAt: string | null; raceEndAt: string | null }) {
   const { label, phase } = useEventTimer(raceStartAt, raceEndAt);
   const color = phase === 'before' ? '#a5b4fc'
               : phase === 'running' ? '#22c55e'
               : phase === 'after' ? '#f59e0b' : '#6b7280';
   return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+      <div style={{
+        fontSize: 'clamp(10px, 0.7vw, 16px)',
+        color: '#6b7280', textTransform: 'uppercase',
+        letterSpacing: '0.1em', fontWeight: 700,
+      }}>
         Rajt / Race clock
       </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 56, fontWeight: 900, color, letterSpacing: '-0.03em', lineHeight: 1 }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 'clamp(32px, 3.2vw, 72px)',
+        fontWeight: 900, color,
+        letterSpacing: '-0.03em', lineHeight: 1,
+      }}>
         {label}
       </div>
     </div>
@@ -143,9 +188,14 @@ function TvActiveRunner({ runner }: { runner: Runner | null }) {
 
   if (!runner) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', background: '#111827', borderRadius: 14, border: '1px solid #1f2937' }}>
-        <div style={{ fontSize: 24, color: '#6b7280' }}>
-          Nincs aktív futó<br /><span style={{ fontSize: 16 }}>No active runner</span>
+      <div style={{
+        padding: 'clamp(24px, 2vw, 56px)',
+        textAlign: 'center', background: '#111827',
+        borderRadius: 14, border: '1px solid #1f2937',
+      }}>
+        <div style={{ fontSize: 'clamp(16px, 1.4vw, 32px)', color: '#6b7280' }}>
+          Nincs aktív futó<br />
+          <span style={{ fontSize: 'clamp(12px, 1vw, 22px)' }}>No active runner</span>
         </div>
       </div>
     );
@@ -154,50 +204,117 @@ function TvActiveRunner({ runner }: { runner: Runner | null }) {
   const progress = runner.target_dist > 0 ? (runner.logged_dist / runner.target_dist) * 100 : 0;
 
   return (
-    <div style={{ padding: 24, background: '#111827', borderRadius: 14, border: '2px solid #ef4444', boxShadow: '0 0 40px rgba(239,68,68,0.2)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 20 }}>
+    <div style={{
+      padding: 'clamp(16px, 1.3vw, 32px)',
+      background: '#111827', borderRadius: 14,
+      border: '2px solid #ef4444',
+      boxShadow: '0 0 clamp(20px, 2vw, 48px) rgba(239,68,68,0.2)',
+      flexShrink: 0,
+    }}>
+      {/* Avatar + name */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        gap: 'clamp(14px, 1.2vw, 26px)',
+        marginBottom: 'clamp(14px, 1.2vw, 24px)',
+      }}>
         <div style={{
-          width: 100, height: 100, borderRadius: '50%', overflow: 'hidden', background: '#1f2937',
-          border: '4px solid #ef4444', animation: 'glow-active 2s infinite', flexShrink: 0,
+          width: 'clamp(64px, 5.5vw, 140px)',
+          height: 'clamp(64px, 5.5vw, 140px)',
+          borderRadius: '50%', overflow: 'hidden', background: '#1f2937',
+          border: '4px solid #ef4444',
+          animation: 'glow-active 2s infinite', flexShrink: 0,
         }}>
           {runner.img_url ? (
-            <img src={runner.img_url} alt={runner.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={runner.img_url} alt={runner.name}
+                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontWeight: 800, color: '#9ca3af' }}>
+            <div style={{
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 'clamp(32px, 2.6vw, 72px)',
+              fontWeight: 800, color: '#9ca3af',
+            }}>
               {runner.name.charAt(0).toUpperCase()}
             </div>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
+          <div style={{
+            fontSize: 'clamp(10px, 0.8vw, 18px)',
+            fontWeight: 800, color: '#ef4444',
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{
+              width: 'clamp(8px, 0.7vw, 14px)', height: 'clamp(8px, 0.7vw, 14px)',
+              borderRadius: '50%', background: '#ef4444',
+              animation: 'pulse 1.5s infinite',
+            }} />
             Most fut · Active
           </div>
-          <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.1, marginTop: 4, letterSpacing: '-0.01em' }}>
+          <div style={{
+            fontSize: 'clamp(22px, 2.2vw, 52px)',
+            fontWeight: 900, lineHeight: 1.1,
+            marginTop: 4, letterSpacing: '-0.01em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {runner.name}
           </div>
         </div>
       </div>
 
-      <div style={{ padding: '20px 16px', background: '#0a0f1a', borderRadius: 10, textAlign: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 14, color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 6 }}>
+      {/* Elapsed - hero */}
+      <div style={{
+        padding: 'clamp(14px, 1.1vw, 26px)',
+        background: '#0a0f1a', borderRadius: 10,
+        textAlign: 'center',
+        marginBottom: 'clamp(12px, 1vw, 22px)',
+      }}>
+        <div style={{
+          fontSize: 'clamp(11px, 0.85vw, 18px)',
+          color: '#6b7280', textTransform: 'uppercase',
+          fontWeight: 700, letterSpacing: '0.08em',
+          marginBottom: 'clamp(4px, 0.4vw, 10px)',
+        }}>
           Futóidő · Elapsed
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 72, fontWeight: 900, color: '#fbbf24', letterSpacing: '-0.03em', lineHeight: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'clamp(42px, 4.5vw, 104px)',
+          fontWeight: 900, color: '#fbbf24',
+          letterSpacing: '-0.03em', lineHeight: 1,
+        }}>
           {elapsed}
         </div>
       </div>
 
+      {/* Distance */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          marginBottom: 'clamp(6px, 0.6vw, 12px)',
+          fontSize: 'clamp(11px, 0.85vw, 18px)',
+          color: '#9ca3af', textTransform: 'uppercase',
+          letterSpacing: '0.08em', fontWeight: 700,
+        }}>
           <span>Táv · Distance</span>
           <span>{progress.toFixed(0)}%</span>
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, marginBottom: 10 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'clamp(22px, 2vw, 44px)',
+          fontWeight: 800,
+          marginBottom: 'clamp(8px, 0.7vw, 14px)',
+        }}>
           <span style={{ color: '#ef4444' }}>{runner.logged_dist.toFixed(2)}</span>
-          <span style={{ color: '#6b7280', fontSize: 24 }}> / {runner.target_dist} km</span>
+          <span style={{ color: '#6b7280', fontSize: 'clamp(16px, 1.4vw, 32px)' }}>
+            {' / '}{runner.target_dist} km
+          </span>
         </div>
-        <div style={{ height: 16, background: '#1f2937', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{
+          height: 'clamp(12px, 1vw, 22px)',
+          background: '#1f2937', borderRadius: 999, overflow: 'hidden',
+        }}>
           <div style={{
             height: '100%', width: `${Math.min(100, progress)}%`,
             background: 'linear-gradient(90deg, #ef4444, #fbbf24)',
@@ -215,41 +332,69 @@ function TvRunnerTile({ runner, color }: { runner: Runner; color: string }) {
 
   return (
     <div style={{
-      flex: '0 0 auto', minWidth: 180, padding: 14, background: '#0a0f1a',
+      padding: 'clamp(8px, 0.7vw, 16px) clamp(10px, 0.9vw, 20px)',
+      background: '#0a0f1a',
       borderRadius: 10, border: `2px solid ${border}`,
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', alignItems: 'center',
+      gap: 'clamp(8px, 0.7vw, 14px)',
       opacity: runner.is_finished ? 0.75 : 1, position: 'relative',
+      minWidth: 0,
     }}>
       <div style={{
-        width: 50, height: 50, borderRadius: '50%', overflow: 'hidden',
+        width: 'clamp(38px, 3.2vw, 72px)',
+        height: 'clamp(38px, 3.2vw, 72px)',
+        borderRadius: '50%', overflow: 'hidden',
         border: `2px solid ${color}`, background: '#1f2937', flexShrink: 0,
       }}>
         {runner.img_url ? (
-          <img src={runner.img_url} alt={runner.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={runner.img_url} alt={runner.name}
+               style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#9ca3af' }}>
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 'clamp(16px, 1.4vw, 32px)',
+            fontWeight: 800, color: '#9ca3af',
+          }}>
             {runner.name.charAt(0).toUpperCase()}
           </div>
         )}
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{
+          fontSize: 'clamp(12px, 1vw, 22px)',
+          fontWeight: 800,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
           {runner.name}
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#9ca3af' }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'clamp(10px, 0.85vw, 18px)',
+          color: '#9ca3af',
+        }}>
           {runner.logged_dist.toFixed(1)} / {runner.target_dist} km
         </div>
-        <div style={{ marginTop: 4, height: 4, background: '#1f2937', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${Math.min(100, progress)}%`, background: color }} />
+        <div style={{
+          marginTop: 4,
+          height: 'clamp(3px, 0.25vw, 6px)',
+          background: '#1f2937', borderRadius: 999, overflow: 'hidden',
+        }}>
+          <div style={{
+            height: '100%', width: `${Math.min(100, progress)}%`, background: color,
+          }} />
         </div>
       </div>
       {runner.is_finished && (
         <div style={{
           position: 'absolute', top: -6, right: -6,
-          width: 26, height: 26, borderRadius: '50%',
+          width: 'clamp(20px, 1.6vw, 34px)',
+          height: 'clamp(20px, 1.6vw, 34px)',
+          borderRadius: '50%',
           background: '#22c55e', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, fontWeight: 800, border: '2px solid #111827',
+          fontSize: 'clamp(11px, 0.9vw, 18px)',
+          fontWeight: 800, border: '2px solid #111827',
         }}>✓</div>
       )}
     </div>

@@ -18,7 +18,10 @@ Frontend a böngészőben fut, az adatok közvetlenül egy **Supabase** Postgres
 2. **New project** → adj neki nevet (pl. `ub-tracker`), régió: `Central EU (Frankfurt)`, erős DB jelszó
 3. Várd meg ~2 percet amíg a projekt provisioning-el
 4. Menj a **SQL Editor**-ba (bal oldali menü) → **New query**
-5. Másold be a teljes `supabase-schema.sql` fájl tartalmát, `Run` gomb
+5. **3 SQL script-et futtass le sorban** (mindegyiknél külön Run gomb):
+   - `supabase-schema.sql` — fő séma (races, runners, position_history, RPC-k)
+   - `supabase-schema-gps-token.sql` — GPSLogger token támogatás
+   - `supabase-schema-storage.sql` — profilkép upload bucket
 6. Menj a **Settings → API**-ba → jegyezd fel:
    - `Project URL`         (pl. `https://xxxxx.supabase.co`)
    - `anon public` API key  (egy hosszú `eyJ…` szöveg)

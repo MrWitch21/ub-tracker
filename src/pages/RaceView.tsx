@@ -67,7 +67,11 @@ export default function RaceView() {
 
       <div className="dashboard-grid" style={{ flex: 1, display: 'grid', overflow: 'hidden' }}>
         <div style={{ position: 'relative', background: '#dce4e6' }}>
-          <RaceMap runners={runners} followRunnerId={effectiveFollow} />
+          <RaceMap
+            runners={runners}
+            followRunnerId={effectiveFollow}
+            raceId={race.id}
+          />
           <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 500, minWidth: 200 }}>
             <EventTimer raceStartAt={raceStartAt} raceEndAt={race.actual_end_at} size="md" />
           </div>
@@ -91,16 +95,6 @@ export default function RaceView() {
           size="md"
         />
       </footer>
-
-      <style>{`
-        .dashboard-grid { grid-template-columns: 1fr 340px; }
-        @media (max-width: 860px) {
-          .dashboard-grid {
-            grid-template-columns: 1fr;
-            grid-template-rows: minmax(40vh, 1fr) auto;
-          }
-        }
-      `}</style>
     </div>
   );
 }
