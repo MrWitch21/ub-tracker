@@ -19,7 +19,7 @@ L.Icon.Default.mergeOptions({
 
 const RUNNER_COLORS = [
   '#ef4444', '#3b82f6', '#16a34a', '#eab308',
-  '#a855f7', '#ec4899', '#14b8a6', '#f97316',
+  '#b45309', '#374151', '#14b8a6', '#f97316',
 ];
 
 export function runnerColor(idx: number): string {
