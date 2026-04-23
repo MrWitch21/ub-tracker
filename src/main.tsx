@@ -7,6 +7,7 @@ import RaceView    from './pages/RaceView';
 import TvView      from './pages/TvView';
 import RunnerView  from './pages/RunnerView';
 import AdminView   from './pages/AdminView';
+import MobileView  from './pages/MobileView';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -20,6 +21,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/race/:code/tv"      element={<TvView />} />
         <Route path="/race/:code/run"     element={<RunnerView />} />
         <Route path="/race/:code/admin"   element={<AdminView />} />
+        <Route path="/race/:code/mobile"  element={<MobileView />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
