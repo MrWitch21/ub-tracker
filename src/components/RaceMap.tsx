@@ -127,6 +127,8 @@ interface Props {
   raceId?: string;
   /** If true, cycles camera: 40s follow active runner -> 20s Balaton overview, repeat. */
   autoPanCycle?: boolean;
+  /** If true, locks camera to Balaton overview (used when race is finished). */
+  forceOverview?: boolean;
   /** Overview bounds for the cycle. Defaults to Balaton. */
   overviewBounds?: L.LatLngBoundsLiteral;
   /** Marker icon scale factor (1 = normal). */
@@ -143,6 +145,7 @@ export default function RaceMap({
   defaultCenter,
   raceId,
   autoPanCycle = false,
+  forceOverview = false,
   overviewBounds = BALATON_BOUNDS,
   markerScale = 1,
   followZoom = 17,
@@ -151,9 +154,14 @@ export default function RaceMap({
   const [routes, setRoutes] = useState<Map<string, PositionPoint[]>>(new Map());
   const [cameraMode, setCameraMode] = useState<CameraMode>('follow');
 
+  // Lock to overview when race is finished
+  useEffect(() => {
+    if (forceOverview) setCameraMode('overview');
+  }, [forceOverview]);
+
   // Camera cycle timer: 40s follow -> 20s overview -> repeat
   useEffect(() => {
-    if (!autoPanCycle) return;
+    if (!autoPanCycle || forceOverview) return;
     setCameraMode('follow');
     let active = true;
 
@@ -168,7 +176,7 @@ export default function RaceMap({
     };
     cycle();
     return () => { active = false; };
-  }, [autoPanCycle]);
+  }, [autoPanCycle, forceOverview]);
 
   // Load each runner's historical route once
   useEffect(() => {
@@ -243,7 +251,7 @@ export default function RaceMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         maxZoom={19}
       />
-      <Pane name="labels" style={{ zIndex: 650, pointerEvents: 'none' }}>
+      <Pane name="labels" style={{ zIndex: 450, pointerEvents: 'none' }}>
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

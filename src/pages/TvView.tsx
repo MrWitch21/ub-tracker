@@ -203,6 +203,7 @@ export default function TvView() {
           followRunnerId={activeRunner?.id ?? null}
           raceId={race.id}
           autoPanCycle
+          forceOverview={!!race.actual_end_at}
           markerScale={3}
           followZoom={17.5}
           overviewZoomOffset={0.3}
