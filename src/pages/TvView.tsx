@@ -133,9 +133,12 @@ export default function TvView() {
         gap: 'clamp(14px, 1.2vw, 28px)',
       }}>
         <TvEventTimer raceStartAt={raceStartAt} raceEndAt={race.actual_end_at} />
-        <TvActiveRunner runner={activeRunner} />
+        {race.actual_end_at
+          ? <TvFinishedBanner teamTotal={teamTotal} target={race.team_target} />
+          : <TvActiveRunner runner={activeRunner} />
+        }
 
-        <div style={{
+        {!race.actual_end_at && <div style={{
           padding: 'clamp(16px, 1.3vw, 28px)',
           background: '#111827',
           borderRadius: 14,
@@ -183,7 +186,7 @@ export default function TvView() {
               transition: 'width 0.8s ease',
             }} />
           </div>
-        </div>
+        </div>}
 
         <div style={{
           marginTop: 'auto',
@@ -564,6 +567,76 @@ function TvRunnerTile({ runner, color }: { runner: Runner; color: string }) {
           OK
         </div>
       )}
+    </div>
+  );
+}
+
+function TvFinishedBanner({ teamTotal, target }: { teamTotal: number; target: number }) {
+  const pct = target > 0 ? Math.min(100, (teamTotal / target) * 100) : 0;
+  return (
+    <div style={{
+      padding: 'clamp(20px, 1.8vw, 44px) clamp(16px, 1.3vw, 32px)',
+      background: 'linear-gradient(135deg, #052e16 0%, #14532d 100%)',
+      borderRadius: 14,
+      border: '2px solid #22c55e',
+      boxShadow: '0 0 clamp(20px, 2vw, 48px) rgba(34,197,94,0.25)',
+      textAlign: 'center',
+      flexShrink: 0,
+    }}>
+      <div style={{
+        fontSize: 'clamp(42px, 4.2vw, 96px)',
+        lineHeight: 1,
+        marginBottom: 'clamp(8px, 0.6vw, 16px)',
+      }}>
+        🏆
+      </div>
+      <div style={{
+        fontSize: 'clamp(26px, 2.5vw, 58px)',
+        fontWeight: 900,
+        color: '#22c55e',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.1,
+      }}>
+        TELJESÍTETTÜK!
+      </div>
+      <div style={{
+        fontSize: 'clamp(13px, 1vw, 22px)',
+        color: '#86efac',
+        fontWeight: 700,
+        marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+      }}>
+        Mission Complete
+      </div>
+      <div style={{
+        marginTop: 'clamp(14px, 1.2vw, 26px)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 'clamp(32px, 3vw, 68px)',
+        fontWeight: 900,
+        color: '#fff',
+        letterSpacing: '-0.03em',
+        lineHeight: 1,
+      }}>
+        {teamTotal.toFixed(1)}
+        <span style={{ fontSize: 'clamp(16px, 1.4vw, 32px)', color: '#6b7280' }}>
+          {' / '}{target.toFixed(0)} km
+        </span>
+      </div>
+      <div style={{
+        marginTop: 'clamp(10px, 0.8vw, 18px)',
+        height: 'clamp(10px, 0.8vw, 16px)',
+        background: '#052e16',
+        borderRadius: 999,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${pct}%`,
+          background: 'linear-gradient(90deg, #16a34a, #22c55e)',
+          transition: 'width 1s ease',
+        }} />
+      </div>
     </div>
   );
 }
