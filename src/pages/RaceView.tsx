@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Tv, Settings, Navigation, Home, Share2 } from 'lucide-react';
+import { Tv, Settings, Navigation, Home, Share2, Smartphone } from 'lucide-react';
 import { useRace } from '../lib/hooks';
 import RaceMap from '../components/RaceMap';
 import ActiveRunnerCard from '../components/ActiveRunnerCard';
@@ -56,6 +56,9 @@ export default function RaceView() {
         </button>
         <Link to={`/race/${code}/run`} title="GPS küldés" style={{ color: '#fff', padding: 8 }}>
           <Navigation size={16} />
+        </Link>
+        <Link to={`/race/${code}/mobile`} title="Mobil nézet" style={{ color: '#fff', padding: 8 }}>
+          <Smartphone size={16} />
         </Link>
         <Link to={`/race/${code}/tv`} title="TV nézet" style={{ color: '#fff', padding: 8 }}>
           <Tv size={16} />
